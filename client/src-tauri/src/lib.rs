@@ -14,6 +14,7 @@ mod settings;
 mod signing;
 mod sse;
 mod tray;
+mod updater;
 
 use cli::Command;
 

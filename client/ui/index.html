@@ -207,6 +207,17 @@
   <h2>This system</h2>
   <div class="card" id="caps"></div>
 
+  <h2>Updates</h2>
+  <div class="card">
+    <div class="test-row" style="margin-top:0">
+      <span>You have <b id="current-version"></b>.</span>
+      <button id="check-updates">Check for updates</button>
+      <button class="primary" id="install-update" hidden>Install and restart</button>
+      <span class="result" id="update-result"></span>
+    </div>
+    <p class="hint" style="margin:8px 0 0">ems-solver also checks on its own every few hours and tells you when an update is ready.</p>
+  </div>
+
   <h2>Files</h2>
   <div class="card files">
     <span>Settings and log: <code id="config-dir"></code></span>
@@ -380,6 +391,7 @@
     view = v;
     const c = v.config;
     $("version").textContent = `v${v.version}`;
+    $("current-version").textContent = `version ${v.version}`;
     $("platform").textContent = `${v.platform} · buffer: ${v.buffer}`;
     const pill = $("answers-pill");
     pill.textContent = v.configured ? v.answers_from : "Not set up";
@@ -508,6 +520,36 @@
   $("test-gemini").addEventListener("click", () => runTest("test-gemini", "gemini-result", "test_gemini", {
     key: secrets.gemini_key === "remove" ? null : ($("gemini-key").value || null), model: $("gemini-model").value,
   }));
+  $("check-updates").addEventListener("click", async () => {
+    const button = $("check-updates");
+    const result = $("update-result");
+    button.disabled = true;
+    result.className = "result";
+    result.textContent = "Checking…";
+    try {
+      const s = await invoke("check_for_updates");
+      $("install-update").hidden = !s.available;
+      result.textContent = s.available ? `Version ${s.available} is available.` : "You're up to date.";
+      result.className = "result ok";
+    } catch (e) {
+      result.textContent = String(e);
+      result.className = "result bad";
+    } finally {
+      button.disabled = false;
+    }
+  });
+  $("install-update").addEventListener("click", async () => {
+    $("install-update").disabled = true;
+    $("update-result").className = "result";
+    $("update-result").textContent = "Downloading… ems-solver will restart by itself.";
+    try {
+      await invoke("install_update");
+    } catch (e) {
+      $("update-result").textContent = String(e);
+      $("update-result").className = "result bad";
+      $("install-update").disabled = false;
+    }
+  });
   $("open-folder").addEventListener("click", () => invoke("open_config_folder").catch((e) => status(String(e), "bad")));
   window.addEventListener("focus", () => { if (!dirty) load().catch(() => {}); });
 

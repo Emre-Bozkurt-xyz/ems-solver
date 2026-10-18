@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
@@ -7,10 +9,15 @@ use crate::api::Mode;
 use crate::app::{self, Core, TrayState};
 use crate::cli::Action;
 use crate::config::{Config, OutputMode, Providers};
+use crate::updater;
 
 const TRAY_ID: &str = "main";
 
 struct Handles {
+    menu: Menu<Wry>,
+    /// Added to the menu (below the status line) once an update is found.
+    update: MenuItem<Wry>,
+    update_shown: AtomicBool,
     status: MenuItem<Wry>,
     add: MenuItem<Wry>,
     send: MenuItem<Wry>,
@@ -96,6 +103,8 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         ],
     )?;
 
+    let update = MenuItem::with_id(app, "update", "Install update", true, None::<&str>)?;
+
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon(&TrayState::Idle))
         .tooltip("ems-solver")
@@ -104,7 +113,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| on_menu(app, event.id().as_ref()))
         .build(app)?;
 
-    app.manage(Handles { status, add, send, clear, modes, outputs });
+    app.manage(Handles { menu, update, update_shown: AtomicBool::new(false), status, add, send, clear, modes, outputs });
     refresh(app);
     Ok(())
 }
@@ -116,6 +125,14 @@ fn on_menu(app: &AppHandle, id: &str) {
         "clear" => app::dispatch(app, Action::Clear),
         "settings" => app::dispatch(app, Action::Settings),
         "quit" => app::dispatch(app, Action::Quit),
+        "update" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = updater::install(&app).await {
+                    app::notify(&app, "Update failed", e);
+                }
+            });
+        }
         _ => {
             if let Ok(mut config) = Config::load() {
                 if let Some(mode) = id.strip_prefix("mode:").and_then(Mode::parse) {
@@ -127,6 +144,15 @@ fn on_menu(app: &AppHandle, id: &str) {
             }
             refresh(app);
         }
+    }
+}
+
+/// Adds (or relabels) the "install update" entry in the menu.
+pub fn show_update(app: &AppHandle, version: &str) {
+    let Some(handles) = app.try_state::<Handles>() else { return };
+    let _ = handles.update.set_text(format!("Install update {version} and restart"));
+    if !handles.update_shown.swap(true, Ordering::SeqCst) {
+        let _ = handles.menu.insert(&handles.update, 1);
     }
 }
 

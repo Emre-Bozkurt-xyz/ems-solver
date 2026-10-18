@@ -10,7 +10,7 @@ use crate::config::{self, Config, Hotkeys, OutputMode, Providers, Secret};
 use crate::gemini::{self, GeminiCredentials};
 use crate::platform::Capability;
 use crate::server::{self, ServerCredentials};
-use crate::{app, log, router, tray};
+use crate::{app, log, router, tray, updater};
 
 #[derive(Serialize)]
 pub struct SettingsView {
@@ -190,6 +190,23 @@ pub async fn test_gemini(key: Option<String>, model: String) -> Result<String, S
     };
     let http = router::http_client().map_err(|e| e.to_string())?;
     gemini::check(&http, &GeminiCredentials { api_key: api_key.trim().into(), model }).await.map_err(|e| e.message)
+}
+
+#[derive(Serialize)]
+pub struct UpdateStatus {
+    current: &'static str,
+    available: Option<String>,
+}
+
+#[tauri::command]
+pub async fn check_for_updates(app: AppHandle) -> Result<UpdateStatus, String> {
+    let available = updater::check(&app).await.map_err(|e| format!("Couldn't check for updates: {e}"))?;
+    Ok(UpdateStatus { current: env!("CARGO_PKG_VERSION"), available })
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    updater::install(&app).await
 }
 
 /// While a hotkey field is being recorded, the current hotkeys must not fire.

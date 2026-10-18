@@ -15,7 +15,11 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "nsis",
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -28,6 +32,25 @@
         "depends": [
           "xdotool"
         ]
+      }
+    },
+    "createUpdaterArtifacts": true,
+    "publisher": "ems-place",
+    "shortDescription": "Send clipboard text and screenshots to an LLM, get the answer pasted back",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJCQ0Y0MkQ5MjVGOUYxREYKUldUZjhma2wyVUxQS3o2UmNQMHBJR0s5UmdtZzZiNW9BMlIreHp5L2U4V0tzcTdjb2hxbldGUGEK",
+      "endpoints": [
+        "https://github.com/Emre-Bozkurt-xyz/ems-solver/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

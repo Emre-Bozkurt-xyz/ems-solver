@@ -14,7 +14,7 @@ use crate::cli::{self, Action, Command};
 use crate::config::{Config, Providers};
 use crate::output::{self, Delivery};
 use crate::platform::{self, Capability, Environment, Status};
-use crate::{capture, log, router, settings, tray};
+use crate::{capture, log, router, settings, tray, updater};
 
 pub struct Core {
     pub env: Mutex<Environment>,
@@ -85,7 +85,7 @@ pub fn core(app: &AppHandle) -> Arc<Core> {
     app.state::<Arc<Core>>().inner().clone()
 }
 
-fn notify(app: &AppHandle, title: &str, body: impl AsRef<str>) {
+pub fn notify(app: &AppHandle, title: &str, body: impl AsRef<str>) {
     log::line(format!("notify: {title}: {}", body.as_ref().replace('\n', " / ")));
     let _ = app.notification().builder().title(title).body(body.as_ref()).show();
 }
@@ -339,6 +339,8 @@ pub fn run(initial: Option<Action>) {
         }))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::Pending::default())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -360,12 +362,15 @@ pub fn run(initial: Option<Action>) {
             settings::test_gemini,
             settings::pause_hotkeys,
             settings::open_config_folder,
+            settings::check_for_updates,
+            settings::install_update,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
             let config = Config::load().unwrap_or_default();
             register_hotkeys(&handle, &config);
             tray::create(&handle)?;
+            updater::start_background_checks(handle.clone());
             if !Providers::resolve(&config).is_configured() && initial.is_none() {
                 open_settings(&handle);
             }

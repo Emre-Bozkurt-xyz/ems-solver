@@ -34,13 +34,14 @@ tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 thiserror = "2.0.21"
 tokio = { version = "1.53.3", features = ["time", "sync", "macros", "rt-multi-thread", "rt"] }
 uuid = { version = "1.28.0", features = ["v4"] }
 which = "8.0.6"
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = [] }
 
 [target."cfg(windows)".dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_System_Console"] }
