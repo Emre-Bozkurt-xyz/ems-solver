@@ -1,0 +1,11 @@
+# Secrets
+.env
+client_config.json
+clients_out/
+generated_clients/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

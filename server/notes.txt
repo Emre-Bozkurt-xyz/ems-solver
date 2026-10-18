@@ -1,0 +1,4 @@
+On .env change:
+
+sudo systemctl restart espanso-solver
+sudo systemctl status espanso-solver --no-pager
