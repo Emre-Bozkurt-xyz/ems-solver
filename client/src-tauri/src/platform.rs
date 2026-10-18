@@ -32,8 +32,8 @@ impl Capability {
     }
 }
 
-// Which variants are constructed depends on the target OS.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+// Each OS constructs only its own variants.
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum PasteMethod {
     SendInput,
