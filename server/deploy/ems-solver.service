@@ -9,9 +9,8 @@ User=deploy
 Group=deploy
 WorkingDirectory=/opt/ems-solver/app
 EnvironmentFile=/opt/ems-solver/.env
-# Listens on the Docker bridge address so the cloudflared container can reach it.
-# It isn't exposed on the LAN or other interfaces.
-ExecStart=/opt/ems-solver/venv/bin/uvicorn ems_solver.main:app --host 172.17.0.1 --port 8011 --no-server-header
+# Localhost only: frpc forwards it to the VPS, which serves solver.ems-place.com.
+ExecStart=/opt/ems-solver/venv/bin/uvicorn ems_solver.main:app --host 127.0.0.1 --port 8011 --no-server-header
 Restart=always
 RestartSec=3
 
