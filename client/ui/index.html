@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ems-solver</title>
+  <style>
+    :root {
+      --bg: #f7f7fb; --card: #ffffff; --text: #1d1d27; --muted: #6b6b7b; --line: #e4e4ee;
+      --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --accent: #6366f1;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16161d; --card: #1f1f29; --text: #ececf3; --muted: #9a9aac; --line: #2e2e3b;
+        --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --accent: #818cf8;
+        color-scheme: dark;
+      }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.5 system-ui, "Segoe UI", Ubuntu, sans-serif; background: var(--bg); color: var(--text); }
+    main { max-width: 640px; margin: 0 auto; padding: 24px 20px 32px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
+    .sub { color: var(--muted); margin: 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 16px; }
+    dl { display: grid; grid-template-columns: 140px 1fr; margin: 0; }
+    dt, dd { margin: 0; padding: 9px 0; border-bottom: 1px solid var(--line); }
+    dt { color: var(--muted); }
+    dl > :nth-last-child(-n+2) { border-bottom: 0; }
+    .cap { display: grid; grid-template-columns: 22px 1fr; gap: 0 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .cap:last-child { border-bottom: 0; }
+    .mark { font-weight: 700; }
+    .available .mark { color: var(--ok); }
+    .limited .mark { color: var(--warn); }
+    .unavailable .mark { color: var(--bad); }
+    .cap .name { font-weight: 600; }
+    .cap .detail { color: var(--muted); }
+    .cap .fix { grid-column: 2; margin-top: 4px; }
+    code { font: 12.5px ui-monospace, Consolas, monospace; background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 1px 5px; border-radius: 4px; }
+    pre { font: 12.5px/1.6 ui-monospace, Consolas, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; overflow-x: auto; margin: 0; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>ems-solver</h1>
+  <p class="sub" id="platform">Loading…</p>
+
+  <h2>Status</h2>
+  <div class="card">
+    <dl>
+      <dt>Answers from</dt><dd id="answers"></dd>
+      <dt>Mode</dt><dd id="mode"></dd>
+      <dt>Output</dt><dd id="output"></dd>
+      <dt>Buffer</dt><dd id="buffer"></dd>
+    </dl>
+  </div>
+
+  <h2>This system</h2>
+  <div class="card" id="caps"></div>
+
+  <h2>Setup from a terminal</h2>
+  <pre>ems-solver set server-url https://your-server
+ems-solver set client-id &lt;id&gt;
+ems-solver set client-secret &lt;secret&gt;
+ems-solver set gemini-key &lt;key&gt;     # optional fallback, or use on its own
+ems-solver status</pre>
+  <p class="sub" style="margin-top:8px">Config folder: <code id="dir"></code></p>
+</main>
+<script>
+  const marks = { available: "✓", limited: "!", unavailable: "✗" };
+  const text = (el, value) => { document.getElementById(el).textContent = value; };
+
+  async function load() {
+    const o = await window.__TAURI__.core.invoke("get_overview");
+    text("platform", `Running on ${o.platform}`);
+    text("answers", o.answers_from);
+    text("mode", o.mode);
+    text("output", o.output);
+    text("buffer", o.buffer);
+    text("dir", o.config_dir);
+
+    const caps = document.getElementById("caps");
+    caps.replaceChildren(...o.capabilities.map((c) => {
+      const row = document.createElement("div");
+      row.className = `cap ${c.status}`;
+      const mark = document.createElement("span");
+      mark.className = "mark";
+      mark.textContent = marks[c.status];
+      const body = document.createElement("div");
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = c.name;
+      const detail = document.createElement("div");
+      detail.className = "detail";
+      detail.textContent = c.detail;
+      body.append(name, detail);
+      if (c.fix) {
+        const fix = document.createElement("div");
+        fix.className = "fix";
+        fix.textContent = `→ ${c.fix}`;
+        body.append(fix);
+      }
+      row.append(mark, body);
+      return row;
+    }));
+  }
+
+  load().catch((e) => text("platform", `Couldn't load status: ${e}`));
+  window.addEventListener("focus", () => load().catch(() => {}));
+</script>
+</body>
+</html>

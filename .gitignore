@@ -9,3 +9,8 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Client build output
+node_modules/
+client/src-tauri/target/
+client/src-tauri/gen/
