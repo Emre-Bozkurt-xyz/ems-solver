@@ -112,6 +112,11 @@ client may fall back to another provider (such as Gemini).
 A network failure, or a 5xx without this JSON body (for example from a proxy), should also
 be treated as retryable.
 
+## `POST /v1/ping`
+
+Signed, any body (clients send `{}`). Returns `{"ok": true, "client_id": "..."}` if the
+credentials are valid, or the usual 401 error. Doesn't call the model.
+
 ## `GET /healthz`
 
 `{"ok": true}`, no auth.

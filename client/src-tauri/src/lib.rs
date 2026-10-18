@@ -10,6 +10,7 @@ mod platform;
 mod prompt;
 mod router;
 mod server;
+mod settings;
 mod signing;
 mod sse;
 mod tray;

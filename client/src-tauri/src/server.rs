@@ -10,6 +10,7 @@ use crate::api::{Answer, Mode, Part, Provider, SolveError};
 use crate::{signing, sse};
 
 const STREAM_PATH: &str = "/v1/solve/stream";
+const PING_PATH: &str = "/v1/ping";
 
 #[derive(Clone, Debug)]
 pub struct ServerCredentials {
@@ -43,23 +44,23 @@ fn error_from_body(err: ErrorBody) -> SolveError {
 }
 
 /// Splits "https://host/prefix" into the URL to call and the path to sign.
-fn endpoint(base_url: &str) -> Result<(String, String), SolveError> {
+fn endpoint(base_url: &str, api_path: &str) -> Result<(String, String), SolveError> {
     let base = reqwest::Url::parse(base_url.trim())
         .map_err(|e| SolveError::fatal(format!("invalid server URL {base_url:?}: {e}")))?;
-    let path = format!("{}{STREAM_PATH}", base.path().trim_end_matches('/'));
+    let path = format!("{}{api_path}", base.path().trim_end_matches('/'));
     let mut url = base.clone();
     url.set_path(&path);
     Ok((url.to_string(), path))
 }
 
-pub async fn solve(
+/// Sends a signed POST and turns error statuses into a SolveError.
+async fn signed_post(
     http: &reqwest::Client,
     creds: &ServerCredentials,
-    mode: Mode,
-    parts: &[Part],
-) -> Result<Answer, SolveError> {
-    let (url, path) = endpoint(&creds.url)?;
-    let body = serde_json::to_vec(&json!({ "mode": mode, "parts": parts })).expect("request serializes");
+    api_path: &str,
+    body: Vec<u8>,
+) -> Result<reqwest::Response, SolveError> {
+    let (url, path) = endpoint(&creds.url, api_path)?;
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs().to_string();
     let nonce = uuid::Uuid::new_v4().simple().to_string();
     let signature = signing::sign(&creds.secret, "POST", &path, &creds.client_id, &timestamp, &nonce, &body);
@@ -67,7 +68,6 @@ pub async fn solve(
     let response = http
         .post(&url)
         .header("Content-Type", "application/json")
-        .header("Accept", "text/event-stream")
         .header("X-Ems-Client-Id", &creds.client_id)
         .header("X-Ems-Timestamp", &timestamp)
         .header("X-Ems-Nonce", &nonce)
@@ -78,14 +78,46 @@ pub async fn solve(
         .map_err(|e| SolveError::retryable(format!("server unreachable: {e}")))?;
 
     let status = response.status();
-    if !status.is_success() {
-        let text = response.text().await.unwrap_or_default();
-        return Err(match serde_json::from_str::<ErrorEnvelope>(&text) {
-            Ok(envelope) => error_from_body(envelope.error),
-            // No JSON error body: a proxy (Cloudflare, frp) answered, so the server is down.
-            Err(_) => SolveError { message: format!("server returned HTTP {status}"), retryable: status.is_server_error() },
-        });
+    if status.is_success() {
+        return Ok(response);
     }
+    let text = response.text().await.unwrap_or_default();
+    Err(match serde_json::from_str::<ErrorEnvelope>(&text) {
+        Ok(envelope) => error_from_body(envelope.error),
+        // No JSON error body: a proxy (Cloudflare, frp) answered, so the server is down.
+        Err(_) => SolveError { message: format!("server returned HTTP {status}"), retryable: status.is_server_error() },
+    })
+}
+
+/// Checks the URL and credentials without asking the model anything.
+pub async fn ping(http: &reqwest::Client, creds: &ServerCredentials) -> Result<String, SolveError> {
+    let response = signed_post(http, creds, PING_PATH, b"{}".to_vec()).await.map_err(|e| {
+        if e.message.starts_with("server returned HTTP 4") {
+            SolveError::fatal(format!("that URL doesn't look like an ems-solver server ({})", e.message.trim_start_matches("server returned ")))
+        } else if e.message.ends_with("(unauthorized)") {
+            SolveError::fatal(format!("the server rejected these credentials: {}", e.message.trim_start_matches("server: ").trim_end_matches(" (unauthorized)")))
+        } else {
+            e
+        }
+    })?;
+    let body: serde_json::Value = response
+        .json()
+        .await
+        .map_err(|_| SolveError::fatal("that URL answered, but it isn't an ems-solver server"))?;
+    match body.get("client_id").and_then(|v| v.as_str()) {
+        Some(id) => Ok(format!("Connected as {id}")),
+        None => Err(SolveError::fatal("that URL answered, but it isn't an ems-solver server")),
+    }
+}
+
+pub async fn solve(
+    http: &reqwest::Client,
+    creds: &ServerCredentials,
+    mode: Mode,
+    parts: &[Part],
+) -> Result<Answer, SolveError> {
+    let body = serde_json::to_vec(&json!({ "mode": mode, "parts": parts })).expect("request serializes");
+    let response = signed_post(http, creds, STREAM_PATH, body).await?;
 
     let mut parser = sse::Parser::default();
     let mut stream = response.bytes_stream();
@@ -124,13 +156,13 @@ mod tests {
     #[test]
     fn endpoint_keeps_path_prefix() {
         assert_eq!(
-            endpoint("https://example.com").unwrap(),
+            endpoint("https://example.com", STREAM_PATH).unwrap(),
             ("https://example.com/v1/solve/stream".into(), "/v1/solve/stream".into())
         );
         assert_eq!(
-            endpoint("https://example.com/solver/").unwrap(),
-            ("https://example.com/solver/v1/solve/stream".into(), "/solver/v1/solve/stream".into())
+            endpoint("https://example.com/solver/", PING_PATH).unwrap(),
+            ("https://example.com/solver/v1/ping".into(), "/solver/v1/ping".into())
         );
-        assert!(endpoint("not a url").is_err());
+        assert!(endpoint("not a url", STREAM_PATH).is_err());
     }
 }

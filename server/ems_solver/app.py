@@ -123,6 +123,13 @@ def create_app(settings: Settings, solver: Solver | None = None) -> FastAPI:
     async def healthz():
         return {"ok": True}
 
+    @app.post("/v1/ping")
+    async def ping(request: Request):
+        # Lets clients check their credentials without calling the model.
+        body = await _read_body(request, settings.max_body_bytes)
+        client_id = verifier.verify(request.method, request.url.path, request.headers, body)
+        return {"ok": True, "client_id": client_id}
+
     @app.post("/v1/solve")
     async def solve(request: Request):
         client_id, req, blocks = await accept(request)

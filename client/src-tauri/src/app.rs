@@ -5,17 +5,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Result};
-use serde::Serialize;
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::api::{self, Part};
 use crate::cli::{self, Action, Command};
-use crate::config::{self, Config, Providers};
+use crate::config::{Config, Providers};
 use crate::output::{self, Delivery};
 use crate::platform::{self, Capability, Environment, Status};
-use crate::{capture, log, router, tray};
+use crate::{capture, log, router, settings, tray};
 
 pub struct Core {
     pub env: Mutex<Environment>,
@@ -59,6 +58,10 @@ impl Core {
         f(guard.as_mut().unwrap())
     }
 
+    pub fn buffer_summary(&self) -> String {
+        api::summarize(&self.buffer.lock().unwrap())
+    }
+
     pub fn tray_state(&self, configured: bool) -> TrayState {
         if self.busy.load(Ordering::SeqCst) {
             return TrayState::Busy;
@@ -78,7 +81,7 @@ impl Core {
     }
 }
 
-fn core(app: &AppHandle) -> Arc<Core> {
+pub fn core(app: &AppHandle) -> Arc<Core> {
     app.state::<Arc<Core>>().inner().clone()
 }
 
@@ -221,9 +224,20 @@ async fn solve_and_deliver(app: &AppHandle, core: &Arc<Core>, config: &Config) -
     Ok(())
 }
 
-fn register_hotkeys(app: &AppHandle, core: &Arc<Core>, config: &Config) {
+/// Unregisters every hotkey, e.g. while the user records a new one in Settings.
+pub fn unregister_hotkeys(app: &AppHandle) {
+    let _ = app.global_shortcut().unregister_all();
+    core(app).hotkeys.lock().unwrap().clear();
+}
+
+/// (Re)registers the hotkeys from `config` and records the outcome as a capability.
+pub fn register_hotkeys(app: &AppHandle, config: &Config) -> Capability {
+    let core = core(app);
+    unregister_hotkeys(app);
     if !core.env.lock().unwrap().hotkeys_supported {
-        return;
+        return core.env.lock().unwrap().capabilities.iter().find(|c| c.name == platform::HOTKEYS).cloned().unwrap_or(
+            Capability { name: platform::HOTKEYS, status: Status::Unavailable, detail: "not supported here".into(), fix: None },
+        );
     }
     let mut registered = Vec::new();
     let mut failed = Vec::new();
@@ -247,7 +261,10 @@ fn register_hotkeys(app: &AppHandle, core: &Arc<Core>, config: &Config) {
             Err(e) => failed.push(format!("{combo} (not a valid shortcut: {e})")),
         }
     }
-    let capability = if failed.is_empty() {
+    drop(map);
+    let capability = if registered.is_empty() && failed.is_empty() {
+        Capability { name: platform::HOTKEYS, status: Status::Limited, detail: "none set".into(), fix: None }
+    } else if failed.is_empty() {
         Capability { name: platform::HOTKEYS, status: Status::Available, detail: registered.join(" · "), fix: None }
     } else {
         Capability {
@@ -257,7 +274,8 @@ fn register_hotkeys(app: &AppHandle, core: &Arc<Core>, config: &Config) {
             fix: Some("another app may be using these keys; choose different ones in Settings".into()),
         }
     };
-    core.env.lock().unwrap().set(capability);
+    core.env.lock().unwrap().set(capability.clone());
+    capability
 }
 
 pub fn hotkey_label(app: &AppHandle, action: Action) -> Option<String> {
@@ -273,35 +291,7 @@ pub fn hotkey_label(app: &AppHandle, action: Action) -> Option<String> {
     registered.then_some(combo)
 }
 
-#[derive(Serialize)]
-struct Overview {
-    platform: String,
-    answers_from: String,
-    mode: String,
-    output: String,
-    buffer: String,
-    capabilities: Vec<Capability>,
-    config_dir: String,
-}
-
-#[tauri::command]
-fn get_overview(app: AppHandle) -> Overview {
-    let core = core(&app);
-    let config = Config::load().unwrap_or_default();
-    let env = core.env.lock().unwrap().clone();
-    let buffer = api::summarize(&core.buffer.lock().unwrap());
-    Overview {
-        platform: env.platform,
-        answers_from: Providers::resolve(&config).describe(),
-        mode: config.mode.label().into(),
-        output: config.output.label().into(),
-        buffer,
-        capabilities: env.capabilities,
-        config_dir: config::config_dir().display().to_string(),
-    }
-}
-
-fn open_settings(app: &AppHandle) {
+pub fn open_settings(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -309,12 +299,22 @@ fn open_settings(app: &AppHandle) {
         return;
     }
     let built = WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
-        .title("ems-solver")
-        .inner_size(620.0, 680.0)
-        .min_inner_size(480.0, 400.0)
+        .title("ems-solver settings")
+        .inner_size(680.0, 820.0)
+        .min_inner_size(520.0, 480.0)
         .build();
-    if let Err(e) = built {
-        notify(app, "Couldn't open settings", e.to_string());
+    match built {
+        Ok(window) => {
+            // Recording a hotkey pauses them all; make sure they come back however the window closes.
+            let app = app.clone();
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::Destroyed = event {
+                    register_hotkeys(&app, &Config::load().unwrap_or_default());
+                    tray::refresh(&app);
+                }
+            });
+        }
+        Err(e) => notify(app, "Couldn't open settings", e.to_string()),
     }
 }
 
@@ -338,6 +338,7 @@ pub fn run(initial: Option<Action>) {
             }
         }))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -352,11 +353,18 @@ pub fn run(initial: Option<Action>) {
                 .build(),
         )
         .manage(shared.clone())
-        .invoke_handler(tauri::generate_handler![get_overview])
+        .invoke_handler(tauri::generate_handler![
+            settings::get_settings,
+            settings::save_settings,
+            settings::test_server,
+            settings::test_gemini,
+            settings::pause_hotkeys,
+            settings::open_config_folder,
+        ])
         .setup(move |app| {
             let handle = app.handle().clone();
             let config = Config::load().unwrap_or_default();
-            register_hotkeys(&handle, &shared, &config);
+            register_hotkeys(&handle, &config);
             tray::create(&handle)?;
             if !Providers::resolve(&config).is_configured() && initial.is_none() {
                 open_settings(&handle);

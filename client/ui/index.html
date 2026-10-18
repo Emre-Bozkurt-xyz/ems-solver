@@ -3,92 +3,354 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ems-solver</title>
+  <title>ems-solver settings</title>
   <style>
     :root {
-      --bg: #f7f7fb; --card: #ffffff; --text: #1d1d27; --muted: #6b6b7b; --line: #e4e4ee;
-      --ok: #15803d; --warn: #b45309; --bad: #b91c1c; --accent: #6366f1;
+      --bg: #f6f6fa; --card: #ffffff; --text: #1c1c26; --muted: #686879; --line: #e3e3ec;
+      --input: #ffffff; --input-line: #cfcfdc; --accent: #5b5bf0; --accent-text: #ffffff;
+      --accent-soft: rgba(91, 91, 240, .10); --ok: #15803d; --warn: #b45309; --bad: #c42b2b;
+      --ok-soft: rgba(21, 128, 61, .10); --bad-soft: rgba(196, 43, 43, .09);
       color-scheme: light;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #16161d; --card: #1f1f29; --text: #ececf3; --muted: #9a9aac; --line: #2e2e3b;
-        --ok: #4ade80; --warn: #fbbf24; --bad: #f87171; --accent: #818cf8;
+        --bg: #15151c; --card: #1e1e28; --text: #ececf3; --muted: #9b9bae; --line: #2d2d3a;
+        --input: #17171f; --input-line: #3a3a4a; --accent: #8b8cf8; --accent-text: #12121a;
+        --accent-soft: rgba(139, 140, 248, .14); --ok: #4ade80; --warn: #fbbf24; --bad: #f87171;
+        --ok-soft: rgba(74, 222, 128, .12); --bad-soft: rgba(248, 113, 113, .12);
         color-scheme: dark;
       }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font: 14px/1.5 system-ui, "Segoe UI", Ubuntu, sans-serif; background: var(--bg); color: var(--text); }
-    main { max-width: 640px; margin: 0 auto; padding: 24px 20px 32px; }
-    h1 { font-size: 20px; margin: 0 0 4px; }
-    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 24px 0 8px; }
-    .sub { color: var(--muted); margin: 0; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px 16px; }
-    dl { display: grid; grid-template-columns: 140px 1fr; margin: 0; }
-    dt, dd { margin: 0; padding: 9px 0; border-bottom: 1px solid var(--line); }
-    dt { color: var(--muted); }
-    dl > :nth-last-child(-n+2) { border-bottom: 0; }
-    .cap { display: grid; grid-template-columns: 22px 1fr; gap: 0 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
-    .cap:last-child { border-bottom: 0; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); }
+    body { font: 14px/1.5 system-ui, "Segoe UI", Ubuntu, Cantarell, sans-serif; }
+    main { max-width: 680px; margin: 0 auto; padding: 24px 20px 96px; }
+
+    header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    header h1 { font-size: 20px; margin: 0; }
+    .version { color: var(--muted); }
+    .pill { margin-left: auto; padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+      background: var(--bad-soft); color: var(--bad); }
+    .pill.ok { background: var(--ok-soft); color: var(--ok); }
+    .platform { color: var(--muted); margin: 4px 0 0; }
+
+    h2 { font-size: 12.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 28px 0 8px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .card + .card { margin-top: 12px; }
+    .card h3 { font-size: 14.5px; margin: 0 0 2px; }
+    .hint { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+
+    .field { display: grid; grid-template-columns: 130px 1fr; gap: 10px; align-items: center; margin-top: 10px; }
+    .field > label { color: var(--muted); }
+    .control { display: flex; gap: 8px; align-items: center; min-width: 0; }
+    input[type=text], input[type=password], input[type=url] {
+      flex: 1; min-width: 0; font: inherit; color: var(--text); background: var(--input);
+      border: 1px solid var(--input-line); border-radius: 8px; padding: 7px 10px; }
+    input:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    input.removing { text-decoration: line-through; opacity: .6; }
+
+    button { font: inherit; border-radius: 8px; padding: 7px 12px; cursor: pointer;
+      border: 1px solid var(--input-line); background: var(--card); color: var(--text); white-space: nowrap; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; padding: 8px 18px; }
+    button.link { border: 0; background: none; color: var(--accent); padding: 4px 6px; }
+    button:disabled { opacity: .55; cursor: default; }
+
+    .test-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+    .result { font-size: 13px; }
+    .result.ok { color: var(--ok); }
+    .result.bad { color: var(--bad); }
+
+    .segmented { display: inline-flex; justify-self: start; border: 1px solid var(--input-line); border-radius: 9px; overflow: hidden; }
+    .segmented label { padding: 6px 14px; cursor: pointer; border-right: 1px solid var(--input-line); }
+    .segmented label:last-child { border-right: 0; }
+    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented label.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+    .choices { display: grid; gap: 8px; }
+    .choice { display: grid; grid-template-columns: 22px 1fr; gap: 2px 6px; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 10px; cursor: pointer; }
+    .choice.on { border-color: var(--accent); background: var(--accent-soft); }
+    .choice input { margin: 3px 0 0; }
+    .choice small { grid-column: 2; color: var(--muted); }
+    .choice small.warn { color: var(--warn); }
+
+    .check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; cursor: pointer; }
+    .check input { margin-top: 3px; }
+    .check small { display: block; color: var(--muted); }
+
+    .hotkey { font-family: ui-monospace, Consolas, "Ubuntu Mono", monospace; cursor: pointer; caret-color: transparent; }
+    .hotkey.recording { border-color: var(--accent); background: var(--accent-soft); }
+    .cmd-list { display: grid; gap: 6px; margin-top: 8px; }
+    .cmd { display: flex; gap: 8px; align-items: center; }
+    .cmd span { min-width: 150px; color: var(--muted); }
+    code { font: 12.5px ui-monospace, Consolas, "Ubuntu Mono", monospace; background: var(--accent-soft); padding: 2px 6px; border-radius: 5px; }
+    .notice { margin-top: 12px; padding: 10px 12px; border-radius: 9px; background: var(--bad-soft); color: var(--text); font-size: 13px; }
+    .notice.ok { background: var(--ok-soft); }
+
+    .cap { display: grid; grid-template-columns: 20px 1fr; gap: 0 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+    .cap:first-child { padding-top: 0; }
+    .cap:last-child { border-bottom: 0; padding-bottom: 0; }
     .mark { font-weight: 700; }
     .available .mark { color: var(--ok); }
     .limited .mark { color: var(--warn); }
     .unavailable .mark { color: var(--bad); }
     .cap .name { font-weight: 600; }
-    .cap .detail { color: var(--muted); }
-    .cap .fix { grid-column: 2; margin-top: 4px; }
-    code { font: 12.5px ui-monospace, Consolas, monospace; background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 1px 5px; border-radius: 4px; }
-    pre { font: 12.5px/1.6 ui-monospace, Consolas, monospace; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; overflow-x: auto; margin: 0; }
+    .cap .detail, .cap .fix { color: var(--muted); font-size: 13px; }
+    .cap .fix { color: var(--text); }
+
+    .files { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .files code { word-break: break-all; }
+
+    .savebar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line); }
+    .savebar .inner { max-width: 680px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+    #save-status { flex: 1; font-size: 13px; color: var(--muted); }
+    #save-status.bad { color: var(--bad); }
+    #save-status.ok { color: var(--ok); }
+
+    @media (max-width: 560px) {
+      .field { grid-template-columns: 1fr; gap: 4px; }
+      .cmd { flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
 <main>
-  <h1>ems-solver</h1>
-  <p class="sub" id="platform">Loading…</p>
+  <header>
+    <h1>ems-solver</h1>
+    <span class="version" id="version"></span>
+    <span class="pill" id="answers-pill">Loading…</span>
+  </header>
+  <p class="platform" id="platform"></p>
 
-  <h2>Status</h2>
+  <h2>Where answers come from</h2>
   <div class="card">
-    <dl>
-      <dt>Answers from</dt><dd id="answers"></dd>
-      <dt>Mode</dt><dd id="mode"></dd>
-      <dt>Output</dt><dd id="output"></dd>
-      <dt>Buffer</dt><dd id="buffer"></dd>
-    </dl>
+    <h3>Your server (Claude)</h3>
+    <p class="hint">Ask whoever runs the server for these three values.</p>
+    <div class="field"><label for="server-url">Server URL</label>
+      <div class="control"><input type="url" id="server-url" placeholder="https://solver.example.com" spellcheck="false"></div></div>
+    <div class="field"><label for="client-id">Client ID</label>
+      <div class="control"><input type="text" id="client-id" spellcheck="false" autocomplete="off"></div></div>
+    <div class="field"><label for="client-secret">Client secret</label>
+      <div class="control">
+        <input type="password" id="client-secret" autocomplete="off">
+        <button class="link" id="client-secret-remove" hidden>Remove</button>
+      </div></div>
+    <div class="test-row"><button id="test-server">Test connection</button><span class="result" id="server-result"></span></div>
+  </div>
+
+  <div class="card">
+    <h3>Gemini</h3>
+    <p class="hint">Optional backup if the server is down, or the only source if you don't have server access.
+      Get a free key at aistudio.google.com.</p>
+    <div class="field"><label for="gemini-key">API key</label>
+      <div class="control">
+        <input type="password" id="gemini-key" autocomplete="off">
+        <button class="link" id="gemini-key-remove" hidden>Remove</button>
+      </div></div>
+    <div class="field"><label for="gemini-model">Model</label>
+      <div class="control"><input type="text" id="gemini-model" spellcheck="false"></div></div>
+    <div class="test-row"><button id="test-gemini">Test key</button><span class="result" id="gemini-result"></span></div>
+  </div>
+  <p class="hint" id="secret-store" style="margin-top:10px"></p>
+
+  <h2>Answers</h2>
+  <div class="card">
+    <div class="field" style="margin-top:0"><label>Mode</label>
+      <div class="segmented" id="mode">
+        <label><input type="radio" name="mode" value="solution">Solution</label>
+        <label><input type="radio" name="mode" value="hint">Hint</label>
+        <label><input type="radio" name="mode" value="checkwork">Check my work</label>
+      </div></div>
+
+    <p class="hint" style="margin:16px 0 8px">When an answer arrives</p>
+    <div class="choices" id="output">
+      <label class="choice"><input type="radio" name="output" value="auto">
+        <span>Automatic</span><small id="auto-desc"></small></label>
+      <label class="choice"><input type="radio" name="output" value="paste">
+        <span>Paste at the cursor</span><small id="paste-desc">Types it into whatever window you're in.</small></label>
+      <label class="choice"><input type="radio" name="output" value="clipboard">
+        <span>Copy to the clipboard</span><small>You paste it yourself, wherever you want.</small></label>
+    </div>
+
+    <label class="check"><input type="checkbox" id="restore-clipboard">
+      <span>Put back what was on my clipboard after pasting<small id="restore-note"></small></span></label>
+    <label class="check"><input type="checkbox" id="notify-on-add">
+      <span>Show a notification when something is added to the buffer</span></label>
+    <label class="check"><input type="checkbox" id="autostart">
+      <span>Start ems-solver when I log in<small id="autostart-note"></small></span></label>
+  </div>
+
+  <h2>Hotkeys</h2>
+  <div class="card" id="hotkeys-card">
+    <div id="hotkeys-supported">
+      <p class="hint">Click a box and press the new combination. <b>Esc</b> cancels, <b>Backspace</b> clears it.</p>
+      <div class="field"><label for="hk-add">Add to buffer</label>
+        <div class="control"><input type="text" class="hotkey" id="hk-add" readonly></div></div>
+      <div class="field"><label for="hk-send">Send</label>
+        <div class="control"><input type="text" class="hotkey" id="hk-send" readonly></div></div>
+      <div class="field"><label for="hk-clear">Clear buffer</label>
+        <div class="control"><input type="text" class="hotkey" id="hk-clear" readonly></div></div>
+    </div>
+    <div id="hotkeys-unsupported" hidden>
+      <p class="hint" id="hotkeys-why"></p>
+      <p style="margin:0" id="hotkeys-fix"></p>
+      <div class="cmd-list">
+        <div class="cmd"><span>Add to buffer</span><code>ems-solver add</code></div>
+        <div class="cmd"><span>Send</span><code>ems-solver send</code></div>
+        <div class="cmd"><span>Clear buffer</span><code>ems-solver clear</code></div>
+      </div>
+    </div>
+    <div class="notice" id="hotkey-notice" hidden></div>
   </div>
 
   <h2>This system</h2>
   <div class="card" id="caps"></div>
 
-  <h2>Setup from a terminal</h2>
-  <pre>ems-solver set server-url https://your-server
-ems-solver set client-id &lt;id&gt;
-ems-solver set client-secret &lt;secret&gt;
-ems-solver set gemini-key &lt;key&gt;     # optional fallback, or use on its own
-ems-solver status</pre>
-  <p class="sub" style="margin-top:8px">Config folder: <code id="dir"></code></p>
+  <h2>Files</h2>
+  <div class="card files">
+    <span>Settings and log: <code id="config-dir"></code></span>
+    <button id="open-folder">Open folder</button>
+  </div>
 </main>
+
+<div class="savebar"><div class="inner">
+  <span id="save-status"></span>
+  <button class="primary" id="save">Save</button>
+</div></div>
+
 <script>
-  const marks = { available: "✓", limited: "!", unavailable: "✗" };
-  const text = (el, value) => { document.getElementById(el).textContent = value; };
+  const invoke = window.__TAURI__.core.invoke;
+  const $ = (id) => document.getElementById(id);
+  let view = null;
+  let dirty = false;
+  const secrets = { client_secret: "keep", gemini_key: "keep" };
 
-  async function load() {
-    const o = await window.__TAURI__.core.invoke("get_overview");
-    text("platform", `Running on ${o.platform}`);
-    text("answers", o.answers_from);
-    text("mode", o.mode);
-    text("output", o.output);
-    text("buffer", o.buffer);
-    text("dir", o.config_dir);
+  function status(text, kind = "") {
+    const el = $("save-status");
+    el.textContent = text;
+    el.className = kind;
+  }
 
-    const caps = document.getElementById("caps");
-    caps.replaceChildren(...o.capabilities.map((c) => {
+  function markDirty() {
+    dirty = true;
+    status("Unsaved changes");
+  }
+
+  function setRadio(name, value) {
+    document.querySelectorAll(`input[name=${name}]`).forEach((r) => { r.checked = r.value === value; });
+    syncRadios();
+  }
+
+  function radioValue(name) {
+    const checked = document.querySelector(`input[name=${name}]:checked`);
+    return checked ? checked.value : null;
+  }
+
+  function syncRadios() {
+    document.querySelectorAll("#mode label").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+    document.querySelectorAll("#output .choice").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked));
+  }
+
+  // --- secrets: password boxes are write-only; an empty box keeps the saved value ---
+  function setupSecret(key, inputId, removeId, hasValue) {
+    const input = $(inputId);
+    const remove = $(removeId);
+    secrets[key] = "keep";
+    input.value = "";
+    input.classList.remove("removing");
+    input.placeholder = hasValue ? "Saved · type to replace" : "Not set";
+    remove.hidden = !hasValue;
+    remove.textContent = "Remove";
+  }
+
+  function secretChange(key, inputId) {
+    if (secrets[key] === "remove") return { action: "remove" };
+    const value = $(inputId).value.trim();
+    return value ? { action: "set", value } : { action: "keep" };
+  }
+
+  function wireSecret(key, inputId, removeId) {
+    $(inputId).addEventListener("input", () => {
+      if (secrets[key] === "remove") {
+        secrets[key] = "keep";
+        $(inputId).classList.remove("removing");
+        $(removeId).textContent = "Remove";
+      }
+      markDirty();
+    });
+    $(removeId).addEventListener("click", () => {
+      const removing = secrets[key] !== "remove";
+      secrets[key] = removing ? "remove" : "keep";
+      $(inputId).value = "";
+      $(inputId).classList.toggle("removing", removing);
+      $(inputId).placeholder = removing ? "Will be removed when you save" : "Saved · type to replace";
+      $(removeId).textContent = removing ? "Undo" : "Remove";
+      markDirty();
+    });
+  }
+
+  // --- hotkey recorder ---
+  const NAMED = {
+    Space: "Space", Enter: "Enter", Tab: "Tab", Backquote: "Backquote", Minus: "Minus", Equal: "Equal",
+    BracketLeft: "BracketLeft", BracketRight: "BracketRight", Backslash: "Backslash", Semicolon: "Semicolon",
+    Quote: "Quote", Comma: "Comma", Period: "Period", Slash: "Slash", ArrowUp: "ArrowUp", ArrowDown: "ArrowDown",
+    ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight", Home: "Home", End: "End", PageUp: "PageUp",
+    PageDown: "PageDown", Insert: "Insert", Delete: "Delete",
+  };
+
+  function keyName(code) {
+    let m;
+    if ((m = code.match(/^Key([A-Z])$/))) return m[1];
+    if ((m = code.match(/^Digit(\d)$/))) return m[1];
+    if (/^F\d{1,2}$/.test(code)) return code;
+    if (/^Numpad\d$/.test(code)) return code;
+    return NAMED[code] || null;
+  }
+
+  function wireHotkey(input) {
+    let before = "";
+    input.addEventListener("focus", () => {
+      before = input.value;
+      input.classList.add("recording");
+      input.value = "Press keys…";
+      invoke("pause_hotkeys", { paused: true }).catch(() => {});
+    });
+    input.addEventListener("blur", () => {
+      input.classList.remove("recording");
+      if (input.value === "Press keys…") input.value = before;
+      invoke("pause_hotkeys", { paused: false }).catch(() => {});
+    });
+    input.addEventListener("keydown", (e) => {
+      e.preventDefault();
+      const plain = !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+      if (e.code === "Escape" && plain) { input.value = before; input.blur(); return; }
+      if ((e.code === "Backspace" || e.code === "Delete") && plain) { input.value = ""; markDirty(); input.blur(); return; }
+      const key = keyName(e.code);
+      if (!key) return; // a modifier on its own, or a key we can't bind
+      if (plain && !/^F\d{1,2}$/.test(key)) {
+        input.value = "Add Ctrl, Alt, Shift or Super";
+        return;
+      }
+      const combo = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super", key].filter(Boolean).join("+");
+      input.value = combo;
+      before = combo;
+      markDirty();
+      input.blur();
+    });
+  }
+
+  // --- rendering ---
+  function renderCaps(capabilities) {
+    const marks = { available: "✓", limited: "!", unavailable: "✗" };
+    $("caps").replaceChildren(...capabilities.map((c) => {
       const row = document.createElement("div");
       row.className = `cap ${c.status}`;
       const mark = document.createElement("span");
       mark.className = "mark";
       mark.textContent = marks[c.status];
       const body = document.createElement("div");
-      const name = document.createElement("span");
+      const name = document.createElement("div");
       name.className = "name";
       name.textContent = c.name;
       const detail = document.createElement("div");
@@ -106,8 +368,150 @@ ems-solver status</pre>
     }));
   }
 
-  load().catch((e) => text("platform", `Couldn't load status: ${e}`));
-  window.addEventListener("focus", () => load().catch(() => {}));
+  function showHotkeyNotice(cap) {
+    const notice = $("hotkey-notice");
+    if (!cap || cap.status === "available" || !view.hotkeys_supported) { notice.hidden = true; return; }
+    notice.hidden = false;
+    notice.className = "notice";
+    notice.textContent = `Some hotkeys couldn't be registered: ${cap.detail}.${cap.fix ? " " + cap.fix[0].toUpperCase() + cap.fix.slice(1) + "." : ""}`;
+  }
+
+  function render(v) {
+    view = v;
+    const c = v.config;
+    $("version").textContent = `v${v.version}`;
+    $("platform").textContent = `${v.platform} · buffer: ${v.buffer}`;
+    const pill = $("answers-pill");
+    pill.textContent = v.configured ? v.answers_from : "Not set up";
+    pill.classList.toggle("ok", v.configured);
+
+    $("server-url").value = c.server_url;
+    $("client-id").value = c.client_id;
+    $("gemini-model").value = c.gemini_model;
+    setupSecret("client_secret", "client-secret", "client-secret-remove", v.has_client_secret);
+    setupSecret("gemini_key", "gemini-key", "gemini-key-remove", v.has_gemini_key);
+    $("secret-store").textContent = v.secrets_in_keyring
+      ? "Secrets are kept in your system's credential store, not in the settings file."
+      : "No system credential store was found, so secrets are kept in a private file in the settings folder.";
+
+    setRadio("mode", c.mode);
+    setRadio("output", c.output);
+    $("auto-desc").textContent = v.paste_available
+      ? "Pastes at the cursor on this system."
+      : "Copies to the clipboard, because pasting at the cursor isn't available on this system.";
+    const pasteDesc = $("paste-desc");
+    pasteDesc.textContent = v.paste_available
+      ? "Types it into whatever window you're in."
+      : "Not available on this system; answers will be copied instead. See \"This system\" below.";
+    pasteDesc.classList.toggle("warn", !v.paste_available);
+
+    $("restore-clipboard").checked = c.restore_clipboard;
+    $("restore-clipboard").disabled = !v.paste_available;
+    $("restore-note").textContent = v.paste_available
+      ? "Otherwise the answer stays on the clipboard."
+      : "Only applies when pasting at the cursor, which isn't available here.";
+    $("notify-on-add").checked = c.notify_on_add;
+    $("autostart").checked = !!v.autostart;
+    $("autostart").disabled = v.autostart === null;
+    $("autostart-note").textContent = v.autostart === null ? "Couldn't read this setting on this system." : "";
+
+    $("hk-add").value = c.hotkeys.add;
+    $("hk-send").value = c.hotkeys.send;
+    $("hk-clear").value = c.hotkeys.clear;
+    $("hotkeys-supported").hidden = !v.hotkeys_supported;
+    $("hotkeys-unsupported").hidden = v.hotkeys_supported;
+    const hotkeyCap = v.capabilities.find((x) => x.name === "Global hotkeys");
+    if (!v.hotkeys_supported && hotkeyCap) {
+      $("hotkeys-why").textContent = `${hotkeyCap.detail[0].toUpperCase()}${hotkeyCap.detail.slice(1)}.`;
+      const where = hotkeyCap.fix && hotkeyCap.fix.match(/ in (.+)$/);
+      $("hotkeys-fix").textContent = where
+        ? `Instead, add these commands as keyboard shortcuts in ${where[1]}:`
+        : "Instead, add these commands as keyboard shortcuts in your desktop's settings:";
+    }
+    showHotkeyNotice(hotkeyCap);
+
+    renderCaps(v.capabilities);
+    $("config-dir").textContent = v.config_dir;
+    dirty = false;
+  }
+
+  async function load() {
+    render(await invoke("get_settings"));
+  }
+
+  async function save() {
+    const button = $("save");
+    button.disabled = true;
+    status("Saving…");
+    try {
+      const report = await invoke("save_settings", { input: {
+        server_url: $("server-url").value,
+        client_id: $("client-id").value,
+        gemini_model: $("gemini-model").value,
+        mode: radioValue("mode"),
+        output: radioValue("output"),
+        restore_clipboard: $("restore-clipboard").checked,
+        notify_on_add: $("notify-on-add").checked,
+        autostart: $("autostart").checked,
+        hotkeys: { add: $("hk-add").value, send: $("hk-send").value, clear: $("hk-clear").value },
+        client_secret: secretChange("client_secret", "client-secret"),
+        gemini_key: secretChange("gemini_key", "gemini-key"),
+      } });
+      await load();
+      showHotkeyNotice(report.hotkeys);
+      status(report.warnings.length ? `Saved. ${report.warnings.join(" ")}` : "Saved", report.warnings.length ? "bad" : "ok");
+    } catch (e) {
+      status(String(e), "bad");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function runTest(buttonId, resultId, command, args) {
+    const button = $(buttonId);
+    const result = $(resultId);
+    button.disabled = true;
+    result.className = "result";
+    result.textContent = "Testing…";
+    try {
+      result.textContent = `✓ ${await invoke(command, args)}`;
+      result.className = "result ok";
+    } catch (e) {
+      result.textContent = `✗ ${e}`;
+      result.className = "result bad";
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  // --- wiring ---
+  document.querySelectorAll("input[type=text], input[type=url], input[type=checkbox], input[type=radio]")
+    .forEach((el) => {
+      if (el.classList.contains("hotkey")) return;
+      el.addEventListener(el.type === "text" || el.type === "url" ? "input" : "change", () => { syncRadios(); markDirty(); });
+    });
+  wireSecret("client_secret", "client-secret", "client-secret-remove");
+  wireSecret("gemini_key", "gemini-key", "gemini-key-remove");
+  document.querySelectorAll(".hotkey").forEach(wireHotkey);
+
+  $("save").addEventListener("click", save);
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s" && !document.activeElement.classList.contains("hotkey")) {
+      e.preventDefault();
+      save();
+    }
+  });
+  $("test-server").addEventListener("click", () => runTest("test-server", "server-result", "test_server", {
+    url: $("server-url").value, clientId: $("client-id").value,
+    secret: secrets.client_secret === "remove" ? null : ($("client-secret").value || null),
+  }));
+  $("test-gemini").addEventListener("click", () => runTest("test-gemini", "gemini-result", "test_gemini", {
+    key: secrets.gemini_key === "remove" ? null : ($("gemini-key").value || null), model: $("gemini-model").value,
+  }));
+  $("open-folder").addEventListener("click", () => invoke("open_config_folder").catch((e) => status(String(e), "bad")));
+  window.addEventListener("focus", () => { if (!dirty) load().catch(() => {}); });
+
+  load().catch((e) => status(`Couldn't load settings: ${e}`, "bad"));
 </script>
 </body>
 </html>

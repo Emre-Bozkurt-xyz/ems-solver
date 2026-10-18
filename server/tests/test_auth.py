@@ -22,6 +22,13 @@ def test_valid_request_is_accepted(client):
     assert post_signed(client, PATH, text_request()).status_code == 200
 
 
+def test_ping_checks_credentials_without_solving(client, solver):
+    ok = post_signed(client, "/v1/ping", b"{}")
+    assert ok.json() == {"ok": True, "client_id": CLIENT_ID}
+    assert post_signed(client, "/v1/ping", b"{}", secret="wrong").status_code == 401
+    assert not solver.calls
+
+
 def test_missing_headers(client):
     response = client.post(PATH, json=text_request())
     assert response.status_code == 401

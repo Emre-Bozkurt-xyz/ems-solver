@@ -10,7 +10,7 @@ use anyhow::{bail, Context, Result};
 
 use crate::api::{Mode, Part};
 use crate::config::{self, Config, OutputMode, Providers, Secret};
-use crate::{capture, platform, router};
+use crate::{capture, gemini, platform, router, server};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Action {
@@ -32,6 +32,7 @@ pub enum Command {
     Output(OutputMode),
     Status,
     Capabilities,
+    Test,
     Ask { texts: Vec<String>, images: Vec<String> },
     Help,
 }
@@ -62,6 +63,7 @@ Configuration:
   mode <solution|hint|checkwork>
   output <auto|paste|clipboard>
   status                       Show the current configuration
+  test                         Check the server credentials and Gemini key
   capabilities                 Show what this system supports
 ";
 
@@ -83,6 +85,7 @@ pub fn parse(args: &[String]) -> Result<Command> {
         }
         ["status"] => Command::Status,
         ["capabilities"] => Command::Capabilities,
+        ["test"] => Command::Test,
         ["help" | "--help" | "-h"] => Command::Help,
         ["ask", rest @ ..] => parse_ask(rest)?,
         _ => bail!("unrecognized command: {}", args.join(" ")),
@@ -128,6 +131,32 @@ fn ask(texts: Vec<String>, images: Vec<String>) -> Result<String> {
     }
     eprintln!("[{} · {}{}]", answer.provider, answer.model, if answer.truncated { " · cut off" } else { "" });
     Ok(answer.text)
+}
+
+fn test_connections() -> Result<String> {
+    let config = Config::load()?;
+    let providers = Providers::resolve(&config);
+    if !providers.is_configured() {
+        bail!("nothing to test: no server credentials or Gemini key are set");
+    }
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+    let http = router::http_client()?;
+    let line = |name: &str, result: Result<String, crate::api::SolveError>| match result {
+        Ok(message) => format!("✓ {name}: {message}"),
+        Err(e) => format!("✗ {name}: {e}"),
+    };
+    let mut lines = Vec::new();
+    runtime.block_on(async {
+        lines.push(match &providers.server {
+            Some(creds) => line("Server", server::ping(&http, creds).await),
+            None => "- Server: not configured".into(),
+        });
+        lines.push(match &providers.gemini {
+            Some(creds) => line("Gemini", gemini::check(&http, creds).await),
+            None => "- Gemini: not configured".into(),
+        });
+    });
+    Ok(lines.join("\n"))
 }
 
 fn read_secret_value(name: &str) -> Result<String> {
@@ -248,6 +277,7 @@ pub fn run_local(command: Command) -> Result<String> {
             Ok(report + &format!("\nAnswers will be {output}.\n"))
         }
         Command::Ask { texts, images } => ask(texts, images),
+        Command::Test => test_connections(),
         Command::Help => Ok(USAGE.to_string()),
         Command::Run | Command::Action(_) => unreachable!("handled by the tray app"),
     }

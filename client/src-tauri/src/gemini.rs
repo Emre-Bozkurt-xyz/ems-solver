@@ -56,6 +56,25 @@ fn parse_answer(body: &Value, model: &str) -> Result<Answer, SolveError> {
     })
 }
 
+/// Checks the key and model name without generating anything.
+pub async fn check(http: &reqwest::Client, creds: &GeminiCredentials) -> Result<String, SolveError> {
+    let url = format!("https://generativelanguage.googleapis.com/v1beta/models/{}", creds.model);
+    let response = http
+        .get(url)
+        .header("x-goog-api-key", &creds.api_key)
+        .send()
+        .await
+        .map_err(|e| SolveError::retryable(format!("Gemini unreachable: {e}")))?;
+    let status = response.status();
+    let body: Value = response.json().await.unwrap_or(Value::Null);
+    if !status.is_success() {
+        let detail = body.pointer("/error/message").and_then(Value::as_str).unwrap_or("no details");
+        return Err(SolveError::fatal(format!("Gemini HTTP {status}: {detail}")));
+    }
+    let name = body.get("displayName").and_then(Value::as_str).unwrap_or(&creds.model);
+    Ok(format!("Key works · {name}"))
+}
+
 pub async fn solve(
     http: &reqwest::Client,
     creds: &GeminiCredentials,
