@@ -1,0 +1,27 @@
+[Unit]
+Description=ems-solver API
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/ems-solver/app
+EnvironmentFile=/opt/ems-solver/.env
+# Listens on the Docker bridge address so the cloudflared container can reach it.
+# It isn't exposed on the LAN or other interfaces.
+ExecStart=/opt/ems-solver/venv/bin/uvicorn ems_solver.main:app --host 172.17.0.1 --port 8011 --no-server-header
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

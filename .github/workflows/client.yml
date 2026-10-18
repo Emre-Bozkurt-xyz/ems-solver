@@ -1,0 +1,47 @@
+name: Client
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "server/ems_solver/system_prompt.md"
+      - "server/ems_solver/prompts.py"
+      - ".github/workflows/client.yml"
+  pull_request:
+    paths:
+      - "client/**"
+      - "server/ems_solver/system_prompt.md"
+      - "server/ems_solver/prompts.py"
+      - ".github/workflows/client.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ubuntu 22.04 so Linux builds also run on older releases than the latest.
+        os: [windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: client/src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
