@@ -71,5 +71,5 @@ jobs:
           TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           rsync -az --delete --exclude '__pycache__/' --exclude '.pytest_cache/' --exclude '.env' \
-            server/ server:/opt/ems-solver/app/
-          ssh server 'bash /opt/ems-solver/app/deploy/remote-deploy.sh'
+            server/ server:/opt/apps/ems-solver/app/
+          ssh server 'bash /opt/apps/ems-solver/app/deploy/remote-deploy.sh'

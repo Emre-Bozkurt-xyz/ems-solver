@@ -7,10 +7,10 @@ Wants=network-online.target
 Type=simple
 User=deploy
 Group=deploy
-WorkingDirectory=/opt/ems-solver/app
-EnvironmentFile=/opt/ems-solver/.env
+WorkingDirectory=/opt/apps/ems-solver/app
+EnvironmentFile=/opt/apps/ems-solver/.env
 # Localhost only: frpc forwards it to the VPS, which serves solver.ems-place.com.
-ExecStart=/opt/ems-solver/venv/bin/uvicorn ems_solver.main:app --host 127.0.0.1 --port 8011 --no-server-header
+ExecStart=/opt/apps/ems-solver/venv/bin/uvicorn ems_solver.main:app --host 127.0.0.1 --port 8011 --no-server-header
 Restart=always
 RestartSec=3
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Runs on the server as `deploy`, after the workflow has synced server/ into /opt/ems-solver/app.
+# Runs on the server as `deploy`, after the workflow has synced server/ into /opt/apps/ems-solver/app.
 set -euo pipefail
 
-ROOT=/opt/ems-solver
+ROOT=/opt/apps/ems-solver
 cd "$ROOT"
 
 if [[ ! -x venv/bin/python ]]; then

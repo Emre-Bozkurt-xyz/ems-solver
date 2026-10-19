@@ -111,9 +111,9 @@ path, compiled into the client.
 
 Pushes to `main` that touch `server/` run the tests and then deploy from a GitHub-hosted
 runner: SSH through Cloudflare Access to `deploy@` the host, sync `server/` into
-`/opt/ems-solver/app`, install requirements and restart the `ems-solver` service. The host
+`/opt/apps/ems-solver/app`, install requirements and restart the `ems-solver` service. The host
 is prepared once with `server/deploy/setup-server.sh` (usage is at the top of the file). The service listens on `127.0.0.1:8011`; frp and the VPS publish it as
-`solver.ems-place.com`. Settings live in `/opt/ems-solver/.env` on the host.
+`solver.ems-place.com`. Settings live in `/opt/apps/ems-solver/.env` on the host.
 
 Repository secrets: `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`, `DEPLOY_SSH_KEY`,
 `DEPLOY_KNOWN_HOSTS`, `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.

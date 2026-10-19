@@ -3,12 +3,13 @@
 #
 #   sudo bash setup-server.sh --deploy-key deploy_key.pub [--env-from OLD.env] [--disable-password-login]
 #
-# Creates the `deploy` user (key-only, no Docker access), /opt/ems-solver, the systemd
+# Creates the `deploy` user (key-only, no Docker access), /opt/apps/ems-solver, the systemd
 # unit, and a sudo rule that only allows restarting the service and reading its logs.
-# Safe to run again.
+# The user running sudo joins the `deploy` group so they can read the app and edit .env.
+# Moves an older /opt/ems-solver install into place. Safe to run again.
 set -euo pipefail
 
-usage() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 
 DEPLOY_KEY="" ENV_FROM="" DISABLE_PASSWORDS=0
 while [[ $# -gt 0 ]]; do
@@ -24,8 +25,10 @@ done
 [[ -s $DEPLOY_KEY ]] || { echo "Deploy key $DEPLOY_KEY is missing or empty." >&2; exit 1; }
 
 HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=/opt/ems-solver
+ROOT=/opt/apps/ems-solver
+OLD_ROOT=/opt/ems-solver
 SERVICE=ems-solver
+ADMIN_USER=${SUDO_USER:-}
 
 step() { printf '\n== %s\n' "$*"; }
 
@@ -51,8 +54,19 @@ chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 600 /home/deploy/.ssh/authorized_keys
 echo "ok"
 
+if [[ -d $OLD_ROOT && ! -e $ROOT ]]; then
+  step "Moving $OLD_ROOT to $ROOT"
+  systemctl stop "$SERVICE" 2>/dev/null || true
+  install -d -m 755 /opt/apps
+  mv "$OLD_ROOT" "$ROOT"
+  # A virtualenv hard-codes its own path; the next deploy rebuilds it.
+  rm -rf "$ROOT/venv"
+  echo "moved; the service starts again on the next deploy"
+fi
+
 step "$ROOT"
-install -d -m 750 -o deploy -g deploy "$ROOT" "$ROOT/app"
+# setgid: new files and folders stay in the deploy group.
+install -d -m 2775 -o deploy -g deploy "$ROOT" "$ROOT/app"
 if [[ ! -f $ROOT/.env ]]; then
   if [[ -n $ENV_FROM ]]; then
     sed 's/\r$//' "$ENV_FROM" > "$ROOT/.env"
@@ -67,10 +81,16 @@ CLIENT_SECRETS=
 EOF
     echo "created an empty $ROOT/.env; fill it in before the first deploy"
   fi
-  chown deploy:deploy "$ROOT/.env"
-  chmod 600 "$ROOT/.env"
 else
-  echo "$ROOT/.env already exists; left as is"
+  echo "$ROOT/.env already exists; kept its contents"
+fi
+chown deploy:deploy "$ROOT/.env"
+# Group-editable, so admins in the deploy group can change settings; nobody else can read it.
+chmod 660 "$ROOT/.env"
+
+if [[ -n $ADMIN_USER && $ADMIN_USER != root ]]; then
+  usermod -aG deploy "$ADMIN_USER"
+  echo "$ADMIN_USER can read $ROOT and edit .env (from their next login)"
 fi
 
 step "systemd unit"
