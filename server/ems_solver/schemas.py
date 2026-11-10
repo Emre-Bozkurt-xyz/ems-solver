@@ -3,7 +3,7 @@ from typing import Annotated, Literal, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 ImageMediaType = Literal["image/png", "image/jpeg", "image/gif", "image/webp"]
-Mode = Literal["solution", "hint", "checkwork"]
+Mode = Literal["solution", "answer", "hint", "checkwork"]
 
 
 class TextPart(BaseModel):

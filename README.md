@@ -47,7 +47,7 @@ Typical uses:
 The tray icon shows what's happening: blue dot = something in the buffer, amber = waiting
 for the answer, red = the last request failed (hover for details), grey = not set up.
 
-The tray menu also switches the **mode** (full solution, a hint, or check my work) and
+The tray menu also switches the **mode** (full solution, answer only with no working, a hint, or check my work) and
 where answers go: **pasted at the cursor**, or **copied** for you to paste yourself.
 
 ### Ubuntu (and other Wayland desktops)

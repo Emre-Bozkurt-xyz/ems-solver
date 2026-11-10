@@ -8,6 +8,9 @@ fn instruction(mode: Mode) -> &'static str {
     // Keep in sync with MODE_INSTRUCTIONS in server/ems_solver/prompts.py.
     match mode {
         Mode::Solution => "",
+        Mode::Answer => {
+            "Reply with only the final answer and nothing else: no working, explanation, restated question or Markdown formatting. For a calculation, give just the resulting value (with its unit if the question has one); for multiple choice, just the chosen option; for code, just the code."
+        }
         Mode::Hint => "Give only a hint or the next step unless a full solution is absolutely necessary.",
         Mode::Checkwork => {
             "Treat the input as an attempted solution. Check it, point out mistakes briefly, and give the corrected result."
@@ -27,7 +30,7 @@ mod tests {
     #[test]
     fn mode_instructions_match_server() {
         let server = include_str!("../../../server/ems_solver/prompts.py");
-        for mode in [Mode::Hint, Mode::Checkwork] {
+        for mode in [Mode::Answer, Mode::Hint, Mode::Checkwork] {
             assert!(server.contains(instruction(mode)), "{mode:?} instruction drifted from prompts.py");
         }
     }
@@ -37,5 +40,6 @@ mod tests {
         assert_eq!(lead(Mode::Solution), "Problem:");
         assert!(lead(Mode::Hint).starts_with("Give only a hint"));
         assert!(lead(Mode::Hint).ends_with("\n\nProblem:"));
+        assert!(lead(Mode::Answer).starts_with("Reply with only the final answer"));
     }
 }

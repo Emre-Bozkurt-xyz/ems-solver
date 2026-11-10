@@ -7,16 +7,18 @@ use serde::{Deserialize, Serialize};
 pub enum Mode {
     #[default]
     Solution,
+    Answer,
     Hint,
     Checkwork,
 }
 
 impl Mode {
-    pub const ALL: [Mode; 3] = [Mode::Solution, Mode::Hint, Mode::Checkwork];
+    pub const ALL: [Mode; 4] = [Mode::Solution, Mode::Answer, Mode::Hint, Mode::Checkwork];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Mode::Solution => "solution",
+            Mode::Answer => "answer",
             Mode::Hint => "hint",
             Mode::Checkwork => "checkwork",
         }
@@ -25,6 +27,7 @@ impl Mode {
     pub fn label(self) -> &'static str {
         match self {
             Mode::Solution => "Solution",
+            Mode::Answer => "Answer only",
             Mode::Hint => "Hint",
             Mode::Checkwork => "Check my work",
         }

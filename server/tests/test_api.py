@@ -32,6 +32,16 @@ def test_solve_returns_result(client, solver):
     assert blocks == [{"type": "text", "text": "2+2?"}]
 
 
+
+@pytest.mark.parametrize("mode", ["solution", "answer", "hint", "checkwork"])
+def test_every_mode_is_accepted(client, solver, mode):
+    assert post_signed(client, "/v1/solve", text_request(mode=mode)).status_code == 200
+    assert solver.calls[0][0] == mode
+
+
+def test_unknown_mode_is_rejected(client):
+    assert post_signed(client, "/v1/solve", text_request(mode="essay")).status_code == 400
+
 def test_mixed_parts_keep_order(client, solver):
     payload = {"parts": [{"type": "text", "text": "context"}, image_part(), {"type": "text", "text": "question"}]}
     assert post_signed(client, "/v1/solve", payload).status_code == 200

@@ -60,7 +60,7 @@ Configuration:
   set gemini-key [value]       Reads from stdin when no value is given
   set gemini-model <model>
   unset <key>                  Remove one of the values above
-  mode <solution|hint|checkwork>
+  mode <solution|answer|hint|checkwork>
   output <auto|paste|clipboard>
   status                       Show the current configuration
   test                         Check the server credentials and Gemini key

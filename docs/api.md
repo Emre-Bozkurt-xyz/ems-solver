@@ -44,7 +44,7 @@ The timestamp must be within 60 s of the server clock, and a nonce can be used o
 }
 ```
 
-- `mode`: `solution` (default), `hint`, or `checkwork`.
+- `mode`: `solution` (default), `answer` (only the final answer, no working), `hint`, or `checkwork`.
 - `parts`: 1-20 items, sent to the model in order. When there are several questions,
   the model answers the last one and uses the rest as context.
 - Images: `image/png`, `image/jpeg`, `image/gif`, `image/webp`; at most 10, 5 MB each after
