@@ -6,7 +6,7 @@ import anthropic
 
 from .config import Settings
 from .errors import ApiError
-from .prompts import system_prompt, user_content
+from .prompts import final_text, system_prompt, user_content
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,8 @@ class ClaudeSolver:
                 fallbacks="default",
             ) as stream:
                 async for event in stream:
-                    if event.type == "text" and event.text:
+                    # Answer mode is trimmed to its <answer> block at the end, so nothing streams.
+                    if event.type == "text" and event.text and mode != "answer":
                         yield TextDelta(event.text)
                 message = await stream.get_final_message()
         except anthropic.APIError as exc:
@@ -97,7 +98,7 @@ class ClaudeSolver:
         # its continuation, so joining them gives the same text that was streamed.
         text = "".join(block.text for block in message.content if block.type == "text")
         yield Completed(
-            text=text.strip(),
+            text=final_text(mode, text.strip()),
             model=message.model,
             stop_reason=message.stop_reason,
             usage=Usage(message.usage.input_tokens, message.usage.output_tokens),

@@ -9,7 +9,7 @@ import pytest
 
 from conftest import make_settings
 from ems_solver.errors import ApiError
-from ems_solver.prompts import SYSTEM_PROMPT
+from ems_solver.prompts import SYSTEM_PROMPT, final_text
 from ems_solver.solver import FALLBACK_BETA, ClaudeSolver, Completed, TextDelta
 
 
@@ -92,7 +92,29 @@ def test_answer_mode_overrides_system_prompt_and_reminds_after_the_problem():
     assert fake.kwargs["system"].startswith(SYSTEM_PROMPT + "\n\nAnswer-only mode:")
     content = fake.kwargs["messages"][0]["content"]
     assert content[1] == {"type": "text", "text": "2+2?"}
-    assert content[-1] == {"type": "text", "text": "Reply with the final answer only."}
+    assert content[-1] == {"type": "text", "text": "Reply with the final answer only, inside <answer></answer> tags."}
+
+
+
+def test_answer_mode_returns_only_the_answer_block_and_streams_nothing():
+    raw = "Payoff is -1100.\n\n<answer>-$1100</answer>\n\n(Profit would be 120.44.)"
+    fake = FakeClient(texts=[raw], message=message([raw]))
+    events = collect(ClaudeSolver(make_settings(), fake), mode="answer")
+    assert events == [Completed("-$1100", "claude-sonnet-5-5", "end_turn", events[0].usage)]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("<answer>84 km/h</answer>", "84 km/h"),
+        ("<answer>1</answer> wait, <answer>\n2\n</answer>", "2"),
+        ("<answer>cut off mid", "cut off mid"),
+        ("  no tags at all  ", "no tags at all"),
+    ],
+)
+def test_final_text(raw, expected):
+    assert final_text("answer", raw) == expected
+    assert final_text("solution", raw) == raw
 
 
 def test_solution_mode_uses_the_plain_system_prompt():
