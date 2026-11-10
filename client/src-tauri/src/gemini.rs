@@ -101,7 +101,10 @@ pub async fn solve(
         let status = response.status();
         let reply: Value = response.json().await.unwrap_or(Value::Null);
         if status.is_success() {
-            return parse_answer(&reply, &creds.model);
+            return parse_answer(&reply, &creds.model).map(|mut answer| {
+                answer.text = prompt::final_text(mode, &answer.text);
+                answer
+            });
         }
         let busy = status == StatusCode::TOO_MANY_REQUESTS || status == StatusCode::SERVICE_UNAVAILABLE;
         if busy && attempt < backoff.len() {
@@ -138,7 +141,7 @@ mod tests {
     fn answer_mode_reminds_after_the_problem() {
         let body = request_body(Mode::Answer, &[Part::Text { text: "2+2?".into() }]);
         let sent = body["contents"][0]["parts"].as_array().unwrap();
-        assert_eq!(sent.last().unwrap()["text"], "Reply with the final answer only.");
+        assert_eq!(sent.last().unwrap()["text"], prompt::reminder(Mode::Answer).unwrap());
     }
 
     #[test]

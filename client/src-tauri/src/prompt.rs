@@ -10,7 +10,7 @@ fn instruction(mode: Mode) -> &'static str {
     match mode {
         Mode::Solution => "",
         Mode::Answer => {
-            "Answer-only mode: reply with the final answer and nothing else. This overrides the guidance above: no working, explanation, restated question, caveats, notes about how you interpreted the question, alternative answers or Markdown formatting. If the question is ambiguous, silently go with the most likely interpretation. For a calculation, give just the resulting value (with its unit or currency if it has one); for multiple choice, just the chosen option; for code, just the code."
+            "Answer-only mode: reply with only the final answer, wrapped in <answer></answer> tags, for example <answer>42</answer>. Only the text inside the tags is shown to the user. Inside the tags: no working, explanation, caveats, notes about how you interpreted the question, alternative answers or Markdown formatting. If the question is ambiguous, go with the most likely interpretation. For a calculation, give just the resulting value (with its unit or currency if it has one); for multiple choice, just the chosen option; for code, just the code."
         }
         Mode::Hint => "Give only a hint or the next step unless a full solution is absolutely necessary.",
         Mode::Checkwork => {
@@ -23,8 +23,23 @@ fn instruction(mode: Mode) -> &'static str {
 pub fn reminder(mode: Mode) -> Option<&'static str> {
     // Keep in sync with MODE_REMINDERS in server/ems_solver/prompts.py.
     match mode {
-        Mode::Answer => Some("Reply with the final answer only."),
+        Mode::Answer => Some("Reply with the final answer only, inside <answer></answer> tags."),
         _ => None,
+    }
+}
+
+/// In answer mode, keeps only the last <answer> block; the model sometimes adds working anyway.
+/// Same rule as final_text in server/ems_solver/prompts.py.
+pub fn final_text(mode: Mode, text: &str) -> String {
+    if mode != Mode::Answer {
+        return text.to_string();
+    }
+    match text.rfind("<answer>") {
+        Some(start) => {
+            let rest = &text[start + "<answer>".len()..];
+            rest.split("</answer>").next().unwrap_or(rest).trim().to_string()
+        }
+        None => text.trim().to_string(),
     }
 }
 
@@ -58,7 +73,22 @@ mod tests {
     fn system_prompt_per_mode() {
         assert_eq!(system_prompt(Mode::Solution), BASE_PROMPT.trim());
         assert!(system_prompt(Mode::Answer).ends_with("for code, just the code."));
+        assert!(system_prompt(Mode::Answer).contains("<answer>42</answer>"));
         assert!(system_prompt(Mode::Hint).starts_with("You are a concise but strong problem solver."));
         assert_eq!(reminder(Mode::Hint), None);
+    }
+
+    #[test]
+    fn final_text_keeps_the_last_answer_block() {
+        let cases = [
+            ("Payoff is -1100.\n\n<answer>-$1100</answer>\n\n(Profit: 120.44)", "-$1100"),
+            ("<answer>1</answer> wait, <answer>\n2\n</answer>", "2"),
+            ("<answer>cut off mid", "cut off mid"),
+            ("  no tags at all  ", "no tags at all"),
+        ];
+        for (raw, expected) in cases {
+            assert_eq!(final_text(Mode::Answer, raw), expected);
+            assert_eq!(final_text(Mode::Solution, raw), raw);
+        }
     }
 }
