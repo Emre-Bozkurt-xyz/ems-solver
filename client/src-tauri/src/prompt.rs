@@ -2,14 +2,15 @@
 
 use crate::api::Mode;
 
-pub const SYSTEM_PROMPT: &str = include_str!("../../../server/ems_solver/system_prompt.md");
+const BASE_PROMPT: &str = include_str!("../../../server/ems_solver/system_prompt.md");
 
+/// Appended to the system prompt, so it takes precedence over the general guidance.
 fn instruction(mode: Mode) -> &'static str {
     // Keep in sync with MODE_INSTRUCTIONS in server/ems_solver/prompts.py.
     match mode {
         Mode::Solution => "",
         Mode::Answer => {
-            "Reply with only the final answer and nothing else: no working, explanation, restated question or Markdown formatting. For a calculation, give just the resulting value (with its unit if the question has one); for multiple choice, just the chosen option; for code, just the code."
+            "Answer-only mode: reply with the final answer and nothing else. This overrides the guidance above: no working, explanation, restated question, caveats, notes about how you interpreted the question, alternative answers or Markdown formatting. If the question is ambiguous, silently go with the most likely interpretation. For a calculation, give just the resulting value (with its unit or currency if it has one); for multiple choice, just the chosen option; for code, just the code."
         }
         Mode::Hint => "Give only a hint or the next step unless a full solution is absolutely necessary.",
         Mode::Checkwork => {
@@ -18,28 +19,46 @@ fn instruction(mode: Mode) -> &'static str {
     }
 }
 
-/// The text block that precedes the problem parts.
-pub fn lead(mode: Mode) -> String {
-    format!("{}\n\nProblem:", instruction(mode)).trim().to_string()
+/// Repeated after the problem, which is what the model reads last (often a screenshot).
+pub fn reminder(mode: Mode) -> Option<&'static str> {
+    // Keep in sync with MODE_REMINDERS in server/ems_solver/prompts.py.
+    match mode {
+        Mode::Answer => Some("Reply with the final answer only."),
+        _ => None,
+    }
 }
+
+pub fn system_prompt(mode: Mode) -> String {
+    let base = BASE_PROMPT.trim();
+    match instruction(mode) {
+        "" => base.to_string(),
+        instruction => format!("{base}\n\n{instruction}"),
+    }
+}
+
+/// The text block that precedes the problem parts.
+pub const LEAD: &str = "Problem:";
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn mode_instructions_match_server() {
+    fn mode_texts_match_server() {
         let server = include_str!("../../../server/ems_solver/prompts.py");
-        for mode in [Mode::Answer, Mode::Hint, Mode::Checkwork] {
+        for mode in Mode::ALL {
             assert!(server.contains(instruction(mode)), "{mode:?} instruction drifted from prompts.py");
+            if let Some(reminder) = reminder(mode) {
+                assert!(server.contains(reminder), "{mode:?} reminder drifted from prompts.py");
+            }
         }
     }
 
     #[test]
-    fn lead_text() {
-        assert_eq!(lead(Mode::Solution), "Problem:");
-        assert!(lead(Mode::Hint).starts_with("Give only a hint"));
-        assert!(lead(Mode::Hint).ends_with("\n\nProblem:"));
-        assert!(lead(Mode::Answer).starts_with("Reply with only the final answer"));
+    fn system_prompt_per_mode() {
+        assert_eq!(system_prompt(Mode::Solution), BASE_PROMPT.trim());
+        assert!(system_prompt(Mode::Answer).ends_with("for code, just the code."));
+        assert!(system_prompt(Mode::Hint).starts_with("You are a concise but strong problem solver."));
+        assert_eq!(reminder(Mode::Hint), None);
     }
 }

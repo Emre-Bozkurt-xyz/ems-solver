@@ -75,13 +75,31 @@ def test_request_shape_and_events():
 
     kwargs = fake.kwargs
     assert kwargs["model"] == "claude-sonnet-5-5"
-    assert kwargs["system"] == SYSTEM_PROMPT
+    assert kwargs["system"].startswith(SYSTEM_PROMPT)
+    assert kwargs["system"].endswith("Give only a hint or the next step unless a full solution is absolutely necessary.")
     assert kwargs["output_config"] == {"effort": "high"}
     assert kwargs["betas"] == [FALLBACK_BETA]
     assert kwargs["fallbacks"] == "default"
     content = kwargs["messages"][0]["content"]
-    assert content[0]["text"].startswith("Give only a hint")
+    assert content == [{"type": "text", "text": "Problem:"}, {"type": "text", "text": "2+2?"}]
+
+
+
+def test_answer_mode_overrides_system_prompt_and_reminds_after_the_problem():
+    fake = FakeClient(texts=["4"], message=message(["4"]))
+    collect(ClaudeSolver(make_settings(), fake), mode="answer", blocks=[{"type": "text", "text": "2+2?"}])
+
+    assert fake.kwargs["system"].startswith(SYSTEM_PROMPT + "\n\nAnswer-only mode:")
+    content = fake.kwargs["messages"][0]["content"]
     assert content[1] == {"type": "text", "text": "2+2?"}
+    assert content[-1] == {"type": "text", "text": "Reply with the final answer only."}
+
+
+def test_solution_mode_uses_the_plain_system_prompt():
+    fake = FakeClient(texts=["4"], message=message(["4"]))
+    collect(ClaudeSolver(make_settings(), fake))
+    assert fake.kwargs["system"] == SYSTEM_PROMPT
+    assert len(fake.kwargs["messages"][0]["content"]) == 2
 
 
 def test_refusal_raises_retryable_error():

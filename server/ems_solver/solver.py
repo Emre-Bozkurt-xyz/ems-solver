@@ -6,7 +6,7 @@ import anthropic
 
 from .config import Settings
 from .errors import ApiError
-from .prompts import SYSTEM_PROMPT, user_content
+from .prompts import system_prompt, user_content
 
 log = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class ClaudeSolver:
             async with self._client.beta.messages.stream(
                 model=s.anthropic_model,
                 max_tokens=s.max_output_tokens,
-                system=SYSTEM_PROMPT,
+                system=system_prompt(mode),
                 messages=[{"role": "user", "content": user_content(mode, problem_blocks)}],
                 output_config={"effort": s.anthropic_effort},
                 betas=[FALLBACK_BETA],

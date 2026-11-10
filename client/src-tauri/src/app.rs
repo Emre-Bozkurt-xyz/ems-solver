@@ -181,7 +181,7 @@ async fn solve_and_deliver(app: &AppHandle, core: &Arc<Core>, config: &Config) -
     let buffered = core.buffer.lock().unwrap().clone();
     let parts = if buffered.is_empty() { vec![read_clipboard(core).await.map_err(|e| format!("{e:#}"))?] } else { buffered.clone() };
 
-    log::line(format!("sending {} via {}", api::summarize(&parts), providers.describe()));
+    log::line(format!("sending {} in {} mode via {}", api::summarize(&parts), config.mode.as_str(), providers.describe()));
     let answer = router::solve(&core.http, &providers, config.mode, &parts).await.map_err(|e| e.message)?;
     log::line(format!("answer from {} ({}), {} chars", answer.provider, answer.model, answer.text.len()));
 

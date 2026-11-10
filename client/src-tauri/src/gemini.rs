@@ -17,13 +17,16 @@ pub struct GeminiCredentials {
 }
 
 fn request_body(mode: Mode, parts: &[Part]) -> Value {
-    let mut contents = vec![json!({ "text": prompt::lead(mode) })];
+    let mut contents = vec![json!({ "text": prompt::LEAD })];
     contents.extend(parts.iter().map(|part| match part {
         Part::Text { text } => json!({ "text": text }),
         Part::Image { media_type, data, .. } => json!({ "inline_data": { "mime_type": media_type, "data": data } }),
     }));
+    if let Some(reminder) = prompt::reminder(mode) {
+        contents.push(json!({ "text": reminder }));
+    }
     json!({
-        "systemInstruction": { "parts": [{ "text": prompt::SYSTEM_PROMPT }] },
+        "systemInstruction": { "parts": [{ "text": prompt::system_prompt(mode) }] },
         "contents": [{ "role": "user", "parts": contents }],
     })
 }
@@ -123,10 +126,19 @@ mod tests {
         ];
         let body = request_body(Mode::Hint, &parts);
         let sent = &body["contents"][0]["parts"];
-        assert!(sent[0]["text"].as_str().unwrap().ends_with("Problem:"));
+        assert_eq!(sent[0]["text"], "Problem:");
         assert_eq!(sent[1]["text"], "context");
         assert_eq!(sent[2]["inline_data"]["mime_type"], "image/png");
-        assert!(body["systemInstruction"]["parts"][0]["text"].as_str().unwrap().contains("problem solver"));
+        assert_eq!(sent.as_array().unwrap().len(), 3);
+        let system = body["systemInstruction"]["parts"][0]["text"].as_str().unwrap();
+        assert!(system.contains("problem solver") && system.ends_with("absolutely necessary."));
+    }
+
+    #[test]
+    fn answer_mode_reminds_after_the_problem() {
+        let body = request_body(Mode::Answer, &[Part::Text { text: "2+2?".into() }]);
+        let sent = body["contents"][0]["parts"].as_array().unwrap();
+        assert_eq!(sent.last().unwrap()["text"], "Reply with the final answer only.");
     }
 
     #[test]
