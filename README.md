@@ -131,6 +131,7 @@ git commit -am "Release 0.2.0" && git tag v0.2.0 && git push && git push --tags
 ```
 
 The Release workflow builds the Windows installer and the Linux `.deb`/`.AppImage` into a
-**draft** release. Check it, then publish it; published releases are what installed apps
-update to. Updates are signed: keep a backup of the updater signing key, because without
+**draft** release. Check it, then publish it as the latest release; that is what installed
+apps update to. Don't mark it as a pre-release: GitHub's "latest" link, which the updater
+reads, skips pre-releases. Updates are signed: keep a backup of the updater signing key, because without
 it you can't ship updates to existing installs.
